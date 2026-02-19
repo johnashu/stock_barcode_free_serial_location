@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Stock Barcode - Free Serial Location Pick</title>
+    <style type="text/css">
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+        line-height: 1.6;
+        color: #333;
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      h1 {
+        color: #875a7b;
+        border-bottom: 2px solid #875a7b;
+        padding-bottom: 10px;
+      }
+      h2 {
+        color: #875a7b;
+        margin-top: 2em;
+      }
+      h3 {
+        color: #666;
+        margin-top: 1.5em;
+      }
+      a {
+        color: #00a09d;
+      }
+      code,
+      pre {
+        background-color: #f4f4f4;
+        border-radius: 4px;
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo,
+          monospace;
+      }
+      code {
+        padding: 2px 6px;
+      }
+      pre {
+        padding: 15px;
+        overflow-x: auto;
+      }
+      ul,
+      ol {
+        padding-left: 25px;
+      }
+      li {
+        margin-bottom: 8px;
+      }
+      .badge {
+        display: inline-block;
+        margin-right: 5px;
+      }
+      .note {
+        background-color: #fff3cd;
+        border-left: 4px solid #ffc107;
+        padding: 12px 15px;
+        margin: 15px 0;
+      }
+      .info {
+        background-color: #d1ecf1;
+        border-left: 4px solid #17a2b8;
+        padding: 12px 15px;
+        margin: 15px 0;
+      }
+      .section {
+        margin-bottom: 30px;
+      }
+      .feature-list {
+        background-color: #f8f9fa;
+        padding: 15px 20px;
+        border-radius: 8px;
+        margin: 15px 0;
+      }
+      .feature-list li {
+        margin-bottom: 10px;
+      }
+      .step-number {
+        display: inline-block;
+        width: 24px;
+        height: 24px;
+        background-color: #875a7b;
+        color: white;
+        border-radius: 50%;
+        text-align: center;
+        line-height: 24px;
+        font-size: 14px;
+        margin-right: 8px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 15px 0;
+      }
+      th {
+        background-color: #875a7b;
+        color: white;
+        padding: 10px 12px;
+        text-align: left;
+      }
+      td {
+        padding: 9px 12px;
+        border-bottom: 1px solid #ddd;
+      }
+      tr:nth-child(even) td {
+        background-color: #f8f9fa;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="document">
+      <h1>Stock Barcode - Free Serial Location Pick</h1>
+
+      <p class="badge">
+        <a href="http://www.gnu.org/licenses/lgpl-3.0-standalone.html">
+          <img
+            alt="License: LGPL-3"
+            src="https://img.shields.io/badge/licence-LGPL--3-blue.png"
+          />
+        </a>
+      </p>
+
+      <p>
+        When using the Odoo Barcode app for picking operations with
+        <strong>serial-tracked products</strong>, Odoo reserves stock from a
+        specific source location (e.g. <em>LocA</em>). If an operator physically
+        picks the item from a different location (e.g. <em>LocB</em>), Odoo does
+        not update the source location on the move line, resulting in:
+      </p>
+
+      <ul>
+        <li>
+          <strong>Negative stock (-1)</strong> at the physically-picked location (LocB)
+        </li>
+        <li>
+          <strong>Phantom stock (+1)</strong> remaining at the reserved location (LocA)
+        </li>
+      </ul>
+
+      <div class="info">
+        <strong>Key Benefit:</strong> Warehouse operators can scan any serial
+        from any location without worrying about what Odoo originally reserved.
+        The correct source location is resolved automatically at validation —
+        no extra steps, no serial overrides, no warehouse friction.
+      </div>
+
+      <div class="section" id="features">
+        <h2>Features</h2>
+        <ul class="feature-list">
+          <li>
+            <strong>Auto-corrects source location</strong> for serial-tracked
+            move lines at validation time
+          </li>
+          <li>
+            <strong>No extra steps required</strong> from warehouse operators —
+            fully transparent to users
+          </li>
+          <li>
+            <strong>No UI changes</strong> — works silently in the background
+          </li>
+          <li>
+            <strong>Non-intrusive:</strong> only processes serial-tracked lines
+            with qty done &gt; 0
+          </li>
+          <li>
+            <strong>Safe fallback:</strong> skips lines where the serial cannot
+            be found in stock; Odoo's standard validation error surfaces these
+            naturally
+          </li>
+          <li>
+            <strong>Lot &amp; untracked products unaffected</strong> — existing
+            behaviour unchanged for non-serial lines
+          </li>
+        </ul>
+      </div>
+
+      <div class="section" id="installation">
+        <h2>Installation</h2>
+        <ol>
+          <li>
+            Copy the <code>stock_barcode_free_serial_location</code> folder to
+            your Odoo addons directory.
+          </li>
+          <li>
+            Update the apps list in Odoo (Settings &gt; Apps &gt; Update Apps
+            List).
+          </li>
+          <li>
+            Search for <em>"Stock Barcode - Free Serial Location Pick"</em> and
+            install it.
+          </li>
+        </ol>
+        <p>
+          <strong>Dependency:</strong> Requires the <code>stock_barcode</code>
+          module (standard Odoo Barcode app).
+        </p>
+      </div>
+
+      <div class="section" id="configuration">
+        <h2>Configuration</h2>
+        <p>
+          No configuration is required. The module works automatically for all
+          picking operations once installed.
+        </p>
+      </div>
+
+      <div class="section" id="usage">
+        <h2>Usage</h2>
+        <p>Warehouse operators use the Barcode app exactly as before:</p>
+        <ol>
+          <li>
+            <span class="step-number">1</span>Open a picking in the Barcode app.
+          </li>
+          <li>
+            <span class="step-number">2</span>Scan any serial number — regardless
+            of which location Odoo originally reserved it from.
+          </li>
+          <li>
+            <span class="step-number">3</span>Press <strong>Validate</strong>.
+          </li>
+        </ol>
+        <p>
+          At validation, the module queries <code>stock.quant</code> to find
+          where each scanned serial has positive stock and updates the move
+          line's source location before Odoo records the stock move.
+        </p>
+
+        <div class="note">
+          <strong>Note:</strong> The correction happens at validation time. The
+          Barcode app UI will still display the originally reserved location
+          during scanning — this is cosmetic only and does not affect the final
+          stock move recorded.
+        </div>
+      </div>
+
+      <div class="section" id="technical">
+        <h2>Technical Notes</h2>
+        <p>The fix is applied in two layers:</p>
+        <ul>
+          <li>
+            <code>stock.move.line.fix_serial_source_location()</code> — queries
+            <code>stock.quant</code> for the actual positive internal quant of
+            each serial and updates <code>location_id</code> if it differs from
+            the reserved location.
+          </li>
+          <li>
+            <code>stock.picking.button_validate()</code> — collects all done
+            serial-tracked lines and calls the helper before delegating to the
+            standard validation flow.
+          </li>
+        </ul>
+
+        <h3>Edge Cases</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Scenario</th>
+              <th>Behaviour</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Serial in transit on another picking</td>
+              <td>
+                Quant still shows original location; source location corrected
+                to that location.
+              </td>
+            </tr>
+            <tr>
+              <td>Serial does not exist in stock</td>
+              <td>
+                Quant query returns nothing; location unchanged — standard Odoo
+                error raised on validate.
+              </td>
+            </tr>
+            <tr>
+              <td>Lot / untracked products</td>
+              <td>Skipped entirely — unchanged behaviour.</td>
+            </tr>
+            <tr>
+              <td>Source location already correct</td>
+              <td>No write performed.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="section" id="support">
+        <h2>Support</h2>
+        <p>For support, please contact SJR Nebula:</p>
+        <ul>
+          <li>Website: <a href="https://sjr.ie">https://sjr.ie</a></li>
+          <li>Email: <a href="mailto:info@sjr.ie">info@sjr.ie</a></li>
+        </ul>
+      </div>
+
+      <div class="section" id="credits">
+        <h2>Credits</h2>
+
+        <h3>Authors</h3>
+        <ul>
+          <li>SJR Nebula</li>
+        </ul>
+
+        <h3>Contributors</h3>
+        <ul>
+          <li>John Ashurst</li>
+        </ul>
+      </div>
+    </div>
+  </body>
+</html>
