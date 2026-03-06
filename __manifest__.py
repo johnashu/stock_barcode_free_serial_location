@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Stock Barcode - Free Serial Location Pick",
-    "version": "17.0.1.0.0",
+    "version": "17.0.1.1.0",
     "category": "Inventory/Inventory",
     "summary": "Pick serial-tracked products from any location, not just the reserved one",
     "description": """
@@ -43,6 +43,11 @@ Company: SJR Nebula
     "website": "https://sjr.ie",
     "license": "LGPL-3",
     "depends": ["stock_barcode"],
+    "assets": {
+        "web.assets_backend": [
+            "stock_barcode_free_serial_location/static/src/**/*.js",
+        ],
+    },
     "installable": True,
     "auto_install": False,
     "application": False,
