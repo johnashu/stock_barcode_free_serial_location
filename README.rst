@@ -14,17 +14,15 @@ Stock Barcode - Free Serial Location Pick
 When using the Odoo Barcode app for picking operations with serial-tracked
 products, Odoo reserves stock from a specific source location (e.g. *LocA*).
 If an operator physically picks the item from a different location (e.g. *LocB*),
-Odoo does **not** update the source location on the move line. This results in:
+Odoo records the stock move from the originally-reserved location (*LocA*) — not
+from where the item was actually taken. This results in:
 
-- **-1 (negative) stock** at the physically-picked location (LocB)
-- **Phantom +1 stock** remaining at the reserved location (LocA)
+- **Negative stock (-1)** at the reserved location (*LocA*) — because the serial's
+  quant is at *LocB*, not *LocA*
+- **Phantom stock (+1)** remaining at the physically-picked location (*LocB*) —
+  the serial was never moved out of there in the system
 
-This is default Odoo behaviour — the negative quantity represents a deferred
-internal transfer promise (LocA → LocB). While technically consistent, it
-creates significant friction in busy warehouses with stock spread across many
-locations, as operators must manually override the serial's source each time.
-
-This module eliminates that friction by automatically correcting the source
+This module eliminates that problem by automatically correcting the source
 location on serial-tracked move lines at validation time, with no extra steps
 required from warehouse staff.
 
@@ -39,9 +37,11 @@ Problem in Detail
 Odoo's reservation system assigns a specific ``location_id`` to each
 ``stock.move.line`` when a picking is confirmed. The Barcode app JS model
 (``BarcodePickingModel``) finds the reserved move line when a serial is scanned
-and marks it as done — but never updates ``location_id`` to reflect where the
-serial was physically collected from. The result is that the stock move is
-recorded as ``LocA → Destination`` even though the item came from ``LocB``.
+and assigns the scanned serial to it — but the move line's ``location_id`` remains
+set to the originally-reserved location (*LocA*). When the picking is validated,
+the stock move is recorded as *LocA → Destination* even though the serial's
+actual quant lives at *LocB*. This causes negative stock at *LocA* and leaves
+the serial's quant intact at *LocB*.
 
 Installation
 ============
@@ -90,6 +90,12 @@ Technical Notes
 
 The fix is applied in two layers:
 
+JS patch — ``BarcodePickingModel.createNewLine``
+    Intercepts the point where Odoo would otherwise create a duplicate move line.
+    When a serial is scanned and no matching reserved line is found, the patch
+    locates the first unstarted reserved line for that product and assigns the
+    scanned serial to it directly, avoiding a spurious extra line.
+
 ``stock.move.line.fix_serial_source_location()``
     For each line in the recordset, searches ``stock.quant`` for a positive
     internal quant matching the serial. If found in a different location than
@@ -105,7 +111,8 @@ The fix is applied in two layers:
 | Scenario                                 | Behaviour                                |
 +==========================================+==========================================+
 | Serial in transit on another picking     | Quant still shows original location;     |
-|                                          | location corrected to that location.     |
+|                                          | source location corrected to that        |
+|                                          | location.                                |
 +------------------------------------------+------------------------------------------+
 | Serial does not exist in stock           | Quant query returns nothing; location    |
 |                                          | unchanged — standard Odoo error raised.  |

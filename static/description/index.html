@@ -128,16 +128,19 @@
         When using the Odoo Barcode app for picking operations with
         <strong>serial-tracked products</strong>, Odoo reserves stock from a
         specific source location (e.g. <em>LocA</em>). If an operator physically
-        picks the item from a different location (e.g. <em>LocB</em>), Odoo does
-        not update the source location on the move line, resulting in:
+        picks the item from a different location (e.g. <em>LocB</em>), Odoo
+        records the stock move from the originally-reserved location (<em>LocA</em>)
+        — not from where the item was actually taken. This results in:
       </p>
 
       <ul>
         <li>
-          <strong>Negative stock (-1)</strong> at the physically-picked location (LocB)
+          <strong>Negative stock (-1)</strong> at the reserved location (<em>LocA</em>)
+          — because the serial's quant is at <em>LocB</em>, not <em>LocA</em>
         </li>
         <li>
-          <strong>Phantom stock (+1)</strong> remaining at the reserved location (LocA)
+          <strong>Phantom stock (+1)</strong> remaining at the physically-picked
+          location (<em>LocB</em>) — the serial was never moved out of there in the system
         </li>
       </ul>
 
@@ -230,10 +233,10 @@
         </p>
 
         <div class="note">
-          <strong>Note:</strong> The correction happens at validation time. The
-          Barcode app UI will still display the originally reserved location
-          during scanning — this is cosmetic only and does not affect the final
-          stock move recorded.
+          <strong>Note:</strong> The correction happens at validation time.
+          The Barcode app UI will display the originally reserved location
+          during scanning, but the Python layer corrects the move line source
+          to the serial's actual quant location before the stock move is recorded.
         </div>
       </div>
 

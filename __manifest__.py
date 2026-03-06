@@ -11,15 +11,14 @@ Stock Barcode - Free Serial Location Pick
 When using the Odoo Barcode app for picking operations with serial-tracked
 products, Odoo reserves stock from a specific source location (e.g. LocA).
 If an operator physically picks the item from a different location (e.g. LocB),
-Odoo does not update the source location on the move line. This results in
-negative stock at LocB and phantom stock remaining at LocA — a known limitation
-of the default barcode picking flow.
+Odoo records the stock move from the originally-reserved location (LocA). Since
+the serial's actual quant is at LocB, this causes negative stock at LocA and
+leaves phantom stock at LocB.
 
 This module corrects the source location on serial-tracked move lines
 automatically at validation time. It looks up where each scanned serial
-actually lives in stock and updates the move line's source location to match,
-eliminating the negative stock problem without requiring any extra steps from
-warehouse operators.
+actually lives in stock (via stock.quant) and updates the move line's source
+location to match before Odoo records the stock move.
 
 Features
 --------
@@ -32,6 +31,8 @@ Features
 
 Technical Details
 -----------------
+* JS patch on BarcodePickingModel.createNewLine to route serial scans to the
+  existing reserved line rather than creating a duplicate
 * Overrides ``stock.picking.button_validate`` to fix locations pre-validation
 * Extends ``stock.move.line`` with a helper method for location correction
 * Queries ``stock.quant`` for the positive internal quant of each serial
