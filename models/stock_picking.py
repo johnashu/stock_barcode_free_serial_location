@@ -16,7 +16,7 @@ class StockPicking(models.Model):
         stock at the physical pick location.
         """
         done_serial_lines = self.move_line_ids.filtered(
-            lambda l: l.quantity > 0 and l.product_id.tracking == "serial" and l.lot_id
+            lambda l: l.qty_done > 0 and l.product_id.tracking == "serial" and l.lot_id
         )
         done_serial_lines.fix_serial_source_location()
         return super().button_validate()
