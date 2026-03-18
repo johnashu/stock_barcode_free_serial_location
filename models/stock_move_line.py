@@ -35,6 +35,7 @@ class StockMoveLine(models.Model):
                     [
                         ("lot_id", "=", line.lot_id.id),
                         ("product_id", "=", line.product_id.id),
+                        ("company_id", "=", line.company_id.id),
                         ("quantity", ">", 0),
                         ("location_id.usage", "=", "internal"),
                     ],
