@@ -49,7 +49,7 @@ Website: https://sjr.ie
     "depends": ["stock_barcode"],
     "assets": {
         "web.assets_backend": [
-            "stock_barcode_free_serial_location/static/src/models/barcode_picking_model_patch.js",
+            "static/src/models/barcode_picking_model_patch.js",
         ],
     },
     "images": ["static/description/main_screenshot.png"],
