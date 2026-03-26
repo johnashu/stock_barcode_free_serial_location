@@ -126,26 +126,21 @@ The module operates across two layers:
 
 **Edge cases:**
 
-+------------------------------------------+------------------------------------------+
-| Scenario                                 | Behaviour                                |
-+==========================================+==========================================+
-| Serial in transit on another picking     | Quant still shows original location;     |
-|                                          | location corrected to that location.     |
-+------------------------------------------+------------------------------------------+
-| Serial does not exist in stock           | Quant query returns nothing; location    |
-|                                          | unchanged — standard Odoo error raised.  |
-+------------------------------------------+------------------------------------------+
-| Scan exceeds reserved quantity           | Danger notification shown immediately;   |
-|                                          | scan blocked for all product types.      |
-+------------------------------------------+------------------------------------------+
-| Lot / untracked products                 | Source location fix skipped; quantity    |
-|                                          | guard still applies.                     |
-+------------------------------------------+------------------------------------------+
-| Source location already correct          | No write performed.                      |
-+------------------------------------------+------------------------------------------+
-| Product has no reservation               | Quantity guard not applied (no reserved  |
-|                                          | qty to enforce against).                 |
-+------------------------------------------+------------------------------------------+
+======================================  =======================================
+Scenario                                Behaviour
+======================================  =======================================
+Serial in transit on another picking    Quant still shows original location;
+                                        location corrected to that location.
+Serial does not exist in stock          Quant query returns nothing; location
+                                        unchanged - standard Odoo error raised.
+Scan exceeds reserved quantity          Danger notification shown immediately;
+                                        scan blocked for all product types.
+Lot / untracked products                Source location fix skipped; quantity
+                                        guard still applies.
+Source location already correct         No write performed.
+Product has no reservation              Quantity guard not applied (no reserved
+                                        qty to enforce against).
+======================================  =======================================
 
 Support
 =======
