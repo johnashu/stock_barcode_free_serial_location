@@ -37,11 +37,14 @@ Technical Details
 * Extends ``stock.move.line`` with a helper method for location correction
 * Queries ``stock.quant`` for the positive internal quant of each serial
 
-Author: John Ashurst
+Author: SJR Nebula
 Company: SJR Nebula
+Email: info@sjr.ie
+Website: https://sjr.ie
     """,
-    "author": "SJR Nebula - John Ashurst",
+    "author": "SJR Nebula",
     "website": "https://sjr.ie",
+    "email": "info@sjr.ie",
     "license": "LGPL-3",
     "depends": ["stock_barcode"],
     "assets": {
@@ -49,6 +52,7 @@ Company: SJR Nebula
             "stock_barcode_free_serial_location/static/src/models/barcode_picking_model_patch.js",
         ],
     },
+    "images": ["static/description/main_screenshot.png"],
     "installable": True,
     "auto_install": False,
     "application": False,
