@@ -39,9 +39,11 @@ Technical Details
 
 Author: John Ashurst
 Company: SJR Nebula
+Email: info@sjr.ie
     """,
     "author": "SJR Nebula - John Ashurst",
     "website": "https://sjr.ie",
+    "email": "info@sjr.ie",
     "license": "LGPL-3",
     "depends": ["stock_barcode"],
     "assets": {
