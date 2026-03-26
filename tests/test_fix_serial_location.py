@@ -1,9 +1,10 @@
 # © 2026 SJR Nebula
 # License LGPL-3.0 or later (https://www.gnu.org/licenses/lgpl).
 
-from odoo.tests.common import TransactionCase
+from odoo.tests.common import TransactionCase, tagged
 
 
+@tagged("post_install", "-at_install")
 class TestFixSerialLocation(TransactionCase):
     """Tests for the Python layer of stock_barcode_free_serial_location.
 
@@ -23,12 +24,15 @@ class TestFixSerialLocation(TransactionCase):
         cls.stock_location = cls.warehouse.lot_stock_id
         cls.cust_location = cls.env.ref("stock.stock_location_customers")
 
+        cls.company = cls.warehouse.company_id
+
         # Two shelf sub-locations: the reserved one and where the item actually is
         cls.loc_reserved = cls.env["stock.location"].create(
             {
                 "name": "Test Shelf Reserved",
                 "location_id": cls.stock_location.id,
                 "usage": "internal",
+                "company_id": cls.company.id,
             }
         )
         cls.loc_actual = cls.env["stock.location"].create(
@@ -36,6 +40,7 @@ class TestFixSerialLocation(TransactionCase):
                 "name": "Test Shelf Actual",
                 "location_id": cls.stock_location.id,
                 "usage": "internal",
+                "company_id": cls.company.id,
             }
         )
 
@@ -44,6 +49,7 @@ class TestFixSerialLocation(TransactionCase):
                 "name": "Serial Test Product",
                 "detailed_type": "product",
                 "tracking": "serial",
+                "company_id": cls.company.id,
             }
         )
         cls.product_lot = cls.env["product.product"].create(
@@ -51,6 +57,7 @@ class TestFixSerialLocation(TransactionCase):
                 "name": "Lot Test Product",
                 "detailed_type": "product",
                 "tracking": "lot",
+                "company_id": cls.company.id,
             }
         )
 
@@ -64,16 +71,19 @@ class TestFixSerialLocation(TransactionCase):
         )
 
     def _put_stock(self, location, lot, product=None):
-        self.env["stock.quant"]._update_available_quantity(product or self.product_serial, location, 1, lot_id=lot)
+        self.env["stock.quant"]._update_available_quantity(
+            product or self.product_serial, location, 1, lot_id=lot
+        )
 
     def _create_picking_with_line(self, src_location, lot, product=None, qty_done=1.0):
         """Create a confirmed delivery picking with one move line ready for validate."""
         product = product or self.product_serial
         picking = self.env["stock.picking"].create(
             {
-                "picking_type_id": self.env.ref("stock.picking_type_out").id,
+                "picking_type_id": self.warehouse.out_type_id.id,
                 "location_id": src_location.id,
                 "location_dest_id": self.cust_location.id,
+                "company_id": self.company.id,
             }
         )
         move = self.env["stock.move"].create(
@@ -85,6 +95,7 @@ class TestFixSerialLocation(TransactionCase):
                 "product_uom": product.uom_id.id,
                 "location_id": src_location.id,
                 "location_dest_id": self.cust_location.id,
+                "company_id": self.company.id,
             }
         )
         picking.action_confirm()
@@ -98,7 +109,8 @@ class TestFixSerialLocation(TransactionCase):
                 "location_id": src_location.id,
                 "location_dest_id": self.cust_location.id,
                 "lot_id": lot.id if lot else False,
-                "quantity": qty_done,
+                "qty_done": qty_done,
+                "company_id": self.company.id,
             }
         )
         return picking, move
@@ -150,7 +162,9 @@ class TestFixSerialLocation(TransactionCase):
         lot = self._make_serial("LOT-001", product=self.product_lot)
         self._put_stock(self.loc_actual, lot, product=self.product_lot)
 
-        _, move = self._create_picking_with_line(self.loc_reserved, lot, product=self.product_lot)
+        _, move = self._create_picking_with_line(
+            self.loc_reserved, lot, product=self.product_lot
+        )
         ml = move.move_line_ids
 
         ml.fix_serial_source_location()
@@ -241,6 +255,7 @@ class TestFixSerialLocation(TransactionCase):
                 "name": "Test Shelf Z",
                 "location_id": self.stock_location.id,
                 "usage": "internal",
+                "company_id": self.company.id,
             }
         )
         sn1 = self._make_serial("SN-TWO-001")
@@ -250,9 +265,10 @@ class TestFixSerialLocation(TransactionCase):
 
         picking = self.env["stock.picking"].create(
             {
-                "picking_type_id": self.env.ref("stock.picking_type_out").id,
+                "picking_type_id": self.warehouse.out_type_id.id,
                 "location_id": self.loc_reserved.id,
                 "location_dest_id": self.cust_location.id,
+                "company_id": self.company.id,
             }
         )
         move = self.env["stock.move"].create(
@@ -264,6 +280,7 @@ class TestFixSerialLocation(TransactionCase):
                 "product_uom": self.product_serial.uom_id.id,
                 "location_id": self.loc_reserved.id,
                 "location_dest_id": self.cust_location.id,
+                "company_id": self.company.id,
             }
         )
         picking.action_confirm()
@@ -279,7 +296,8 @@ class TestFixSerialLocation(TransactionCase):
                     "location_id": self.loc_reserved.id,
                     "location_dest_id": self.cust_location.id,
                     "lot_id": sn.id,
-                    "quantity": 1.0,
+                    "qty_done": 1.0,
+                    "company_id": self.company.id,
                 }
             )
 

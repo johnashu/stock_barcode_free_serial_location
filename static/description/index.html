@@ -128,27 +128,32 @@
         When using the Odoo Barcode app for picking operations with
         <strong>serial-tracked products</strong>, Odoo reserves stock from a
         specific source location (e.g. <em>LocA</em>). If an operator physically
-        picks the item from a different location (e.g. <em>LocB</em>), Odoo
-        records the stock move from the originally-reserved location (<em>LocA</em>)
-        — not from where the item was actually taken. This results in:
+        picks the item from a different location (e.g. <em>LocB</em>), Odoo does
+        not update the source location on the move line, resulting in:
       </p>
 
       <ul>
         <li>
-          <strong>Negative stock (-1)</strong> at the reserved location (<em>LocA</em>)
-          — because the serial's quant is at <em>LocB</em>, not <em>LocA</em>
+          <strong>Negative stock (-1)</strong> at the physically-picked location (LocB)
         </li>
         <li>
-          <strong>Phantom stock (+1)</strong> remaining at the physically-picked
-          location (<em>LocB</em>) — the serial was never moved out of there in the system
+          <strong>Phantom stock (+1)</strong> remaining at the reserved location (LocA)
         </li>
       </ul>
+
+      <p>
+        This module eliminates that friction. It automatically corrects source
+        locations at validation time <strong>and</strong> enforces reserved
+        quantities in real time during scanning — preventing both stock integrity
+        issues and over-picking, for all product tracking types.
+      </p>
 
       <div class="info">
         <strong>Key Benefit:</strong> Warehouse operators can scan any serial
         from any location without worrying about what Odoo originally reserved.
-        The correct source location is resolved automatically at validation —
-        no extra steps, no serial overrides, no warehouse friction.
+        The correct source location is resolved automatically at validation.
+        Over-scanning is blocked immediately with a clear notification — no
+        extra steps, no manual overrides, no warehouse friction.
       </div>
 
       <div class="section" id="features">
@@ -156,7 +161,19 @@
         <ul class="feature-list">
           <li>
             <strong>Auto-corrects source location</strong> for serial-tracked
-            move lines at validation time
+            move lines at validation time — operators never need to manually
+            override the source location
+          </li>
+          <li>
+            <strong>Smart serial line matching</strong> — when a serial is
+            scanned, the barcode model finds the most appropriate unstarted
+            reserved line rather than always creating a new one, preserving
+            reservation integrity
+          </li>
+          <li>
+            <strong>Reserved quantity enforcement</strong> — prevents scanning
+            more units than reserved for <em>any</em> product type (serial, lot,
+            or untracked), with an immediate in-app danger notification
           </li>
           <li>
             <strong>No extra steps required</strong> from warehouse operators —
@@ -166,17 +183,9 @@
             <strong>No UI changes</strong> — works silently in the background
           </li>
           <li>
-            <strong>Non-intrusive:</strong> only processes serial-tracked lines
-            with qty done &gt; 0
-          </li>
-          <li>
             <strong>Safe fallback:</strong> skips lines where the serial cannot
             be found in stock; Odoo's standard validation error surfaces these
             naturally
-          </li>
-          <li>
-            <strong>Lot &amp; untracked products unaffected</strong> — existing
-            behaviour unchanged for non-serial lines
           </li>
         </ul>
       </div>
@@ -223,7 +232,12 @@
             of which location Odoo originally reserved it from.
           </li>
           <li>
-            <span class="step-number">3</span>Press <strong>Validate</strong>.
+            <span class="step-number">3</span>If you attempt to scan more units
+            than the picking has reserved for a product, a <strong>danger
+            notification</strong> is shown immediately and the scan is blocked.
+          </li>
+          <li>
+            <span class="step-number">4</span>Press <strong>Validate</strong>.
           </li>
         </ol>
         <p>
@@ -233,16 +247,18 @@
         </p>
 
         <div class="note">
-          <strong>Note:</strong> The correction happens at validation time.
-          The Barcode app UI will display the originally reserved location
-          during scanning, but the Python layer corrects the move line source
-          to the serial's actual quant location before the stock move is recorded.
+          <strong>Note:</strong> The source location correction happens at
+          validation time. The Barcode app UI will still display the originally
+          reserved location during scanning — this is cosmetic only and does not
+          affect the final stock move recorded.
         </div>
       </div>
 
       <div class="section" id="technical">
         <h2>Technical Notes</h2>
-        <p>The fix is applied in two layers:</p>
+        <p>The module operates across two layers:</p>
+
+        <h3>Python (server-side)</h3>
         <ul>
           <li>
             <code>stock.move.line.fix_serial_source_location()</code> — queries
@@ -254,6 +270,27 @@
             <code>stock.picking.button_validate()</code> — collects all done
             serial-tracked lines and calls the helper before delegating to the
             standard validation flow.
+          </li>
+        </ul>
+
+        <h3>JavaScript (client-side)</h3>
+        <ul>
+          <li>
+            <code>BarcodePickingModel.createNewLine()</code> (patch) — for
+            serial-tracked products, finds an unstarted reserved line for that
+            product and redirects to <code>updateLine()</code> on it instead of
+            creating a new one. For all product types, checks whether the total
+            <code>qty_done</code> would exceed the total
+            <code>reserved_uom_qty</code>; if so, shows a danger notification
+            and aborts the scan.
+          </li>
+          <li>
+            <code>BarcodePickingModel.updateLine()</code> (patch) — for all
+            product types, checks whether the incoming <code>qty_done</code>
+            value would push the total done quantity over the total reserved. If
+            so, shows a danger notification and aborts the update. This covers
+            subsequent scans of the same product where an existing line is
+            incremented rather than a new one created.
           </li>
         </ul>
 
@@ -281,12 +318,28 @@
               </td>
             </tr>
             <tr>
+              <td>Scan exceeds reserved quantity</td>
+              <td>
+                Danger notification shown immediately; scan blocked for all
+                product types (serial, lot, untracked).
+              </td>
+            </tr>
+            <tr>
               <td>Lot / untracked products</td>
-              <td>Skipped entirely — unchanged behaviour.</td>
+              <td>
+                Source location fix skipped at validation; reserved quantity
+                guard still applies during scanning.
+              </td>
             </tr>
             <tr>
               <td>Source location already correct</td>
               <td>No write performed.</td>
+            </tr>
+            <tr>
+              <td>Product has no reservation</td>
+              <td>
+                Quantity guard not applied — no reserved qty to enforce against.
+              </td>
             </tr>
           </tbody>
         </table>
