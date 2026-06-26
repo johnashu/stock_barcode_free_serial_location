@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Stock Barcode - Free Serial Location Pick",
-    "version": "17.0.0.1.1",
+    "version": "17.0.0.1.2",
     "category": "Inventory/Inventory",
     "summary": "Pick serial-tracked products from any location, not just the reserved one",
     "description": """
@@ -49,7 +49,7 @@ Website: https://sjr.ie
     "depends": ["stock_barcode"],
     "assets": {
         "web.assets_backend": [
-            "static/src/models/barcode_picking_model_patch.js",
+            "stock_barcode_free_serial_location/static/src/models/barcode_picking_model_patch.js",
         ],
     },
     "images": ["static/description/main_screenshot.png"],
