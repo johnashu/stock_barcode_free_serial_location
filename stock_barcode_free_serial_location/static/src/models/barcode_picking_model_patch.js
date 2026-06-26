@@ -10,14 +10,24 @@ patch(BarcodePickingModel.prototype, {
      * for the product across all pageLines.
      */
     _isOverReserved(product, qty) {
+      if (!product?.id) return false;
       const productLines = this.pageLines.filter(
-        (l) => l.product_id.id === product.id,
+        (l) => l.product_id?.id === product.id,
       );
       const totalReserved = productLines.reduce(
         (sum, l) => sum + (l.reserved_uom_qty || 0),
         0,
       );
-      if (!totalReserved) return false;
+      if (!totalReserved) {
+        this.notification(
+          _t(
+            "You cannot add %(product)s because it is not reserved on this transfer.",
+            { product: product.display_name },
+          ),
+          { type: "danger" },
+        );
+        return true;
+      }
       const doneSoFar = productLines.reduce(
         (sum, l) => sum + (this.getQtyDone(l) || 0),
         0,
@@ -45,7 +55,7 @@ patch(BarcodePickingModel.prototype, {
 
             const reservedLine = this.pageLines.find(
                 (line) =>
-                    line.product_id.id === product.id &&
+                    line.product_id?.id === product.id &&
                     !this.getQtyDone(line) &&
                     line.reserved_uom_qty > 0
             );
@@ -60,9 +70,11 @@ patch(BarcodePickingModel.prototype, {
       },
 
     updateLine(line, params) {
+      const product = line.product_id || params.product_id;
       if (
         params.qty_done !== undefined &&
-        this._isOverReserved(line.product_id, params.qty_done)
+        product?.id &&
+        this._isOverReserved(product, params.qty_done)
       ) {
         return Promise.resolve(false);
       }

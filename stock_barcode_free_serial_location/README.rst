@@ -134,8 +134,8 @@ Edge Cases
 * **Lot or untracked products:** source location fix is skipped; quantity guard
   still applies.
 * **Source location already correct:** no write is performed.
-* **Product has no reservation:** quantity guard is not applied (no reserved qty
-  to enforce against).
+* **Product has no reservation:** the scan is blocked immediately with a danger
+  notification; unreserved products cannot be added to the picking.
 
 Support
 =======
