@@ -11,6 +11,7 @@ patch(BarcodePickingModel.prototype, {
      */
     _isOverReserved(product, qty) {
       if (!product?.id) return false;
+      if (this.config.enforce_reservation_limit === false) return false;
       const productLines = this.pageLines.filter(
         (l) => l.product_id?.id === product.id,
       );

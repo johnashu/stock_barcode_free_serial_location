@@ -22,13 +22,17 @@ location to match before Odoo records the stock move.
 
 It also enforces reserved quantities during barcode scanning: operators cannot
 add products that are not on the transfer or scan more units than were reserved.
+This enforcement applies to warehouse flow operations (Receipts, Deliveries,
+Pick and Pack) and is skipped for standalone Internal Transfers, which keep
+Odoo's default behaviour of allowing extra products.
 
 Features
 --------
 * Auto-corrects source location for serial-tracked move lines on validate
 * Looks up actual serial quant to determine the real pick location
 * Smart serial line matching — routes serial scans to the reserved move line
-* Blocks unreserved products and over-scanning (all tracking types)
+* Blocks unreserved products and over-scanning on warehouse flow operations
+  (Receipts, Deliveries, Pick, Pack); standalone Internal Transfers are exempt
 * No UI changes or extra steps required for warehouse staff
 * Non-intrusive: location fix only affects serial-tracked lines with qty_done > 0
 * Safe: skips lines where the serial cannot be found in stock (surfaces as
