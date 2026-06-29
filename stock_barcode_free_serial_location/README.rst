@@ -2,9 +2,13 @@
 Stock Barcode - Free Serial Location Pick
 ===========================================
 
-An Odoo 17 module that fixes barcode picking stock integrity when serial-tracked
-products are physically picked from a location different from the reserved source
-location.
+An Odoo 17 module that fixes barcode picking stock integrity in two ways:
+
+1. **Serial source location correction** — when a serial is physically picked from
+   a different location than Odoo reserved, the move line ``location_id`` is
+   corrected at validation.
+2. **Reserved quantity enforcement** — operators cannot add products that are not
+   on the transfer, or scan more units than were reserved (all tracking types).
 
 **Author:** John Ashurst
 **Company:** SJR Nebula
@@ -19,13 +23,19 @@ Odoo does **not** update the source location on the move line. This results in:
 - **-1 (negative) stock** at the physically-picked location (LocB)
 - **Phantom +1 stock** remaining at the reserved location (LocA)
 
-This module eliminates that friction. It automatically corrects source locations
-at validation time **and** enforces reserved quantities in real time during
-scanning, preventing both stock integrity issues and over-picking for all
-product tracking types.
+Additionally, Odoo's default barcode model allows operators to add products that
+were never reserved on the transfer, or to scan more units than reserved, which
+leads to over-picking and incorrect stock levels.
+
+This module addresses both problems. Operators can scan serials from any
+physical location (location is corrected at validate), while scans that would
+add unreserved products or exceed reserved quantities are blocked immediately
+with a danger notification.
 
 Overview
 ========
+
+**Location correction (serial-tracked products)**
 
 Odoo's reservation system assigns a specific ``location_id`` to each
 ``stock.move.line`` when a picking is confirmed. The Barcode app JS model
@@ -34,9 +44,17 @@ and marks it as done, but never updates ``location_id`` to reflect where the
 serial was physically collected from. The result is that the stock move is
 recorded as ``LocA -> Destination`` even though the item came from ``LocB``.
 
-Additionally, Odoo's default barcode model does not prevent a user from scanning
-more units than were reserved on the picking, which can lead to over-picking and
-incorrect stock levels.
+At validation, this module queries ``stock.quant`` for each done serial and
+writes the correct source location on the move line before Odoo records the
+stock move.
+
+**Reserved quantity enforcement (all product types)**
+
+During scanning, the patched barcode model compares the total ``qty_done`` for
+each product against the quantity reserved on the transfer when the operation
+was opened. Scans that would add a product with no reservation, or push
+``qty_done`` above that cap, are rejected with an in-app danger notification.
+This applies to serial, lot, and untracked products alike.
 
 Installation
 ============
@@ -60,41 +78,38 @@ operations once installed.
 Usage
 =====
 
-Warehouse operators can continue using the Barcode app exactly as before:
+Warehouse operators can continue using the Barcode app with two guardrails:
 
 1. Open a picking in the Barcode app.
-2. Scan any serial number — regardless of which location Odoo originally
-   reserved it from.
-3. If you attempt to scan more units than the picking has reserved for a
-   product, a warning notification is shown immediately and the scan is blocked.
+2. Scan products and serials as usual — serials may be picked from any location;
+   the source ``location_id`` is corrected automatically at **Validate**.
+3. If you scan a product that is not on the transfer, or scan more units than
+   reserved, a danger notification is shown and the scan is blocked immediately
+   (no confirmation dialog).
 4. Press **Validate**.
-
-At validation, the module queries ``stock.quant`` to find where each scanned
-serial actually has positive stock and updates the move line's source location
-accordingly before Odoo records the stock move.
 
 Features
 ========
 
 - **Auto-corrects source location** for serial-tracked move lines at validation
   time; operators never need to manually override the source location
-- **Smart serial line matching** - when a serial is scanned, the JS model
-  finds the most appropriate unstarted reserved line rather than always creating
-  a new one, preserving reservation integrity
-- **Reserved quantity enforcement** - prevents scanning more units than reserved
-  for *any* product type (serial, lot, or untracked), with an immediate
-  in-app danger notification
-- **No extra steps** required from warehouse operators; fully transparent
-- **No UI changes** - works silently in the background
-- **Safe fallback** - skips lines where the serial cannot be found in stock;
-  Odoo's standard validation error will surface these naturally
+- **Smart serial line matching** — when a serial is scanned, the barcode model
+  finds an unstarted reserved line for that product and updates it instead of
+  creating a duplicate move line
+- **Reserved quantity enforcement** — blocks adding unreserved products and
+  over-scanning for any tracking type (serial, lot, or none), with an immediate
+  danger notification
+- **No extra steps** required from warehouse operators beyond normal scanning
+- **No UI changes** — works silently in the background
+- **Safe fallback** — skips location correction when the serial cannot be found
+  in stock; Odoo's standard validation error surfaces these cases
 
 Technical Notes
 ===============
 
 The module operates across two layers:
 
-**Python (server-side)**
+**Python (server-side) — location correction**
 
 ``stock.move.line.fix_serial_source_location()``
   For each serial-tracked line in the recordset, searches ``stock.quant`` for
@@ -105,22 +120,25 @@ The module operates across two layers:
   Before delegating to the standard validation flow, collects all done
   serial-tracked lines and calls ``fix_serial_source_location()``.
 
-**JavaScript (client-side)**
+**JavaScript (client-side) — scanning behaviour**
 
 ``BarcodePickingModel.createNewLine()`` (patch)
   For serial-tracked products, searches ``pageLines`` for an unstarted reserved
   line for that product. If found, redirects to ``updateLine()`` on that line
-  instead of creating a new one, preserving the reservation.
+  instead of creating a new one, so the Python validation step can correct
+  ``location_id`` when needed.
 
-  For all product types, checks whether the total ``qty_done`` across all lines
-  for the product would exceed the total ``reserved_uom_qty``. If so, shows a
-  danger notification and aborts the scan.
+  For all product types, rejects the scan when the product has no reservation
+  on the transfer or when adding one more unit would exceed the reserved total.
 
-``BarcodePickingModel.updateLine()`` (patch)
-  For all product types, checks whether the new ``qty_done`` value would push
-  the total done quantity over the total reserved. If so, shows a danger
-  notification and aborts the update. This covers subsequent scans of the same
-  product where an existing line is incremented rather than a new one created.
+``BarcodePickingModel._createNewLine()`` (patch)
+  Same reserved-quantity checks for code paths that create lines directly (e.g.
+  excess quantity after filling a line), which bypass ``createNewLine()``.
+
+``BarcodePickingModel._updateLineQty()`` (patch)
+  Enforces the reserved cap on every quantity increment (barcode scans and
+  the + button). Compares cumulative ``qty_done`` against the initial reserved
+  total for the product on this transfer.
 
 Edge Cases
 ==========
@@ -129,13 +147,13 @@ Edge Cases
   source location is corrected to that location.
 * **Serial does not exist in stock:** quant query returns nothing; location is
   unchanged and standard Odoo validation error is raised.
-* **Scan exceeds reserved quantity:** danger notification is shown immediately;
-  scan is blocked for all product types.
-* **Lot or untracked products:** source location fix is skipped; quantity guard
-  still applies.
+* **Scan exceeds reserved quantity:** danger notification; scan blocked for
+  all product types.
+* **Product not on the transfer:** danger notification; scan blocked immediately
+  (Odoo's "add extra product?" confirmation is not shown).
+* **Lot or untracked products:** source location fix is skipped at validation;
+  reserved quantity enforcement still applies during scanning.
 * **Source location already correct:** no write is performed.
-* **Product has no reservation:** quantity guard is not applied (no reserved qty
-  to enforce against).
 
 Support
 =======

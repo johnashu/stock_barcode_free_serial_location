@@ -317,3 +317,44 @@ class TestFixSerialLocation(TransactionCase):
             ]
         )
         self.assertFalse(negative)
+
+    # -------------------------------------------------------------------------
+    # Barcode config — reservation guard scope is decided server-side
+    # -------------------------------------------------------------------------
+
+    def test_barcode_config_enforces_reservation_on_delivery(self):
+        sn = self._make_serial("SN-SEQ-001")
+        self._put_stock(self.loc_reserved, sn)
+        picking, _move = self._create_picking_with_line(self.loc_reserved, sn)
+
+        data = picking._get_stock_barcode_data()
+        self.assertTrue(data["config"]["enforce_reservation_limit"])
+
+    def test_barcode_config_skips_reservation_on_internal_transfer(self):
+        picking = self.env["stock.picking"].create(
+            {
+                "picking_type_id": self.warehouse.int_type_id.id,
+                "location_id": self.stock_location.id,
+                "location_dest_id": self.stock_location.id,
+                "company_id": self.company.id,
+            }
+        )
+
+        data = picking._get_stock_barcode_data()
+        self.assertFalse(data["config"]["enforce_reservation_limit"])
+
+    def test_int_type_detection_ignores_sequence_code_rename(self):
+        """Renaming sequence_code must not affect int-type detection via FK."""
+        int_type = self.warehouse.int_type_id
+        int_type.sequence_code = "CUSTOM-INT"
+
+        picking = self.env["stock.picking"].create(
+            {
+                "picking_type_id": int_type.id,
+                "location_id": self.stock_location.id,
+                "location_dest_id": self.stock_location.id,
+                "company_id": self.company.id,
+            }
+        )
+        data = picking._get_stock_barcode_data()
+        self.assertFalse(data["config"]["enforce_reservation_limit"])
