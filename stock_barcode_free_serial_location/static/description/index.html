@@ -171,9 +171,13 @@
             reservation integrity
           </li>
           <li>
-            <strong>Reserved quantity enforcement</strong> — prevents scanning
-            more units than reserved for <em>any</em> product type (serial, lot,
-            or untracked), with an immediate in-app danger notification
+            <strong>Reserved quantity enforcement</strong> — blocks adding
+            products that are not on the transfer, and blocks scanning more
+            units than reserved, for <em>any</em> product type (serial, lot, or
+            untracked), with an immediate in-app danger notification. Applies to
+            warehouse flow operations (Receipts, Deliveries, Pick, Pack);
+            standalone Internal Transfers keep Odoo's default behaviour of
+            allowing extra products
           </li>
           <li>
             <strong>No extra steps required</strong> from warehouse operators —
@@ -186,6 +190,11 @@
             <strong>Safe fallback:</strong> skips lines where the serial cannot
             be found in stock; Odoo's standard validation error surfaces these
             naturally
+          </li>
+          <li>
+            <strong>Never rewrites completed movements:</strong> lines already in
+            state <code>done</code> are left untouched, so re-validating a
+            picking cannot reverse a transfer that has already happened
           </li>
         </ul>
       </div>
@@ -232,9 +241,10 @@
             of which location Odoo originally reserved it from.
           </li>
           <li>
-            <span class="step-number">3</span>If you attempt to scan more units
-            than the picking has reserved for a product, a <strong>danger
-            notification</strong> is shown immediately and the scan is blocked.
+            <span class="step-number">3</span>If you scan a product that is not
+            on the transfer, or scan more units than reserved, a
+            <strong>danger notification</strong> is shown and the scan is
+            blocked immediately — no confirmation dialog.
           </li>
           <li>
             <span class="step-number">4</span>Press <strong>Validate</strong>.
@@ -264,25 +274,58 @@
             <code>stock.move.line.fix_serial_source_location()</code> — queries
             <code>stock.quant</code> for the actual positive internal quant of
             each serial and updates <code>location_id</code> if it differs from
-            the reserved location.
+            the reserved location. Lines already in state <code>done</code> are
+            skipped: writing <code>location_id</code> on a done line makes Odoo
+            reverse the completed movement
+            (<code>stock/models/stock_move_line.py:502-521</code>), which would
+            return the serial to its original location while the picking still
+            displays as done.
           </li>
           <li>
-            <code>stock.picking.button_validate()</code> — collects all done
-            serial-tracked lines and calls the helper before delegating to the
-            standard validation flow.
+            <code>stock.picking.button_validate()</code> — collects the
+            serial-tracked lines that are <em>not yet done</em> and calls the
+            helper before delegating to the standard validation flow. The
+            not-done filter is required because
+            <code>button_validate()</code> is re-entered routinely — a
+            double-click, or the backorder wizard calling it again
+            (<code>stock/wizard/stock_backorder_confirmation.py:67</code>) — and
+            this override runs <em>before</em> <code>super()</code>, which is
+            itself a no-op on done moves
+            (<code>stock/models/stock_move.py:1914</code>).
+          </li>
+          <li>
+            <code>stock.picking._get_stock_barcode_data()</code> — adds an
+            <code>enforce_reservation_limit</code> flag to the barcode client
+            config. It is false for standalone Internal Transfers, identified by
+            comparing the operation type against the warehouse's
+            <code>int_type_id</code> rather than the user-editable
+            <code>sequence_code</code> prefix, and true for everything else.
           </li>
         </ul>
 
         <h3>JavaScript (client-side)</h3>
         <ul>
           <li>
+            <code>BarcodePickingModel._isOverReserved()</code> (new) — helper
+            shared by the two patches below. Sums <code>reserved_uom_qty</code>
+            for the product across <code>pageLines</code> and compares it with
+            the running <code>qty_done</code> total. Returns true and raises a
+            danger notification when the product has no reservation on the
+            transfer, or when the requested delta would exceed it. Inert when
+            <code>config.enforce_reservation_limit</code> is false.
+          </li>
+          <li>
             <code>BarcodePickingModel.createNewLine()</code> (patch) — for
             serial-tracked products, finds an unstarted reserved line for that
             product and redirects to <code>updateLine()</code> on it instead of
-            creating a new one. For all product types, checks whether the total
-            <code>qty_done</code> would exceed the total
-            <code>reserved_uom_qty</code>; if so, shows a danger notification
-            and aborts the scan.
+            creating a new one. Before redirecting it points
+            <code>lastScanned.sourceLocation</code> at that line's own location,
+            because Odoo's <code>updateLine()</code> stamps that value onto
+            <code>line.location_id</code> whenever the caller does not pass one
+            explicitly
+            (<code>stock_barcode/static/src/models/barcode_picking_model.js:214-216</code>).
+            For all product types, rejects the scan when the product has no
+            reservation or when one more unit would exceed the reserved total.
           </li>
           <li>
             <code>BarcodePickingModel.updateLine()</code> (patch) — for all
@@ -336,9 +379,26 @@
               <td>No write performed.</td>
             </tr>
             <tr>
-              <td>Product has no reservation</td>
+              <td>Product not on the transfer</td>
               <td>
-                Quantity guard not applied — no reserved qty to enforce against.
+                Danger notification; scan blocked immediately. Odoo's "add extra
+                product?" confirmation is not shown.
+              </td>
+            </tr>
+            <tr>
+              <td>Standalone Internal Transfer</td>
+              <td>
+                Reserved quantity guard is disabled — operators may add
+                arbitrary products when moving stock between locations. Pick and
+                Pack are unaffected and stay guarded.
+              </td>
+            </tr>
+            <tr>
+              <td>Picking validated twice</td>
+              <td>
+                Double-click on Validate, or backorder wizard re-entry: the
+                second pass skips all done lines, so the completed transfer is
+                left intact.
               </td>
             </tr>
           </tbody>

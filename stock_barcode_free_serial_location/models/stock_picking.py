@@ -14,12 +14,30 @@ class StockPicking(models.Model):
         the case where a barcode operator picks a serial from a location different
         to the one Odoo originally reserved, which would otherwise produce negative
         stock at the physical pick location.
+
+        Already-done lines are excluded. ``button_validate()`` can legitimately be
+        re-entered on a picking that is already done -- a double-click, or the
+        backorder wizard calling it a second time
+        (odoo/addons/stock/wizard/stock_backorder_confirmation.py:67) -- and
+        Odoo's own ``super()`` is a no-op in that case because done moves are
+        filtered out at odoo/addons/stock/models/stock_move.py:1914. This override
+        runs *before* ``super()``, so without this guard it would still rewrite the
+        source location of lines whose stock has already moved, reversing the
+        transfer. See ``fix_serial_source_location`` for the mechanism.
+
+        There is deliberately no company filter here. ``self.move_line_ids`` are
+        by definition the lines of this picking, and each line's ``company_id``
+        is copied from its move (or the picking) at creation
+        (odoo/addons/stock/models/stock_move_line.py:343-346), so the comparison
+        never excluded anything. The company filter that does matter is on the
+        quant search in ``fix_serial_source_location``, which is scoped to
+        ``line.company_id``.
         """
         done_serial_lines = self.move_line_ids.filtered(
             lambda l: l.qty_done > 0
+            and l.state != "done"
             and l.product_id.tracking == "serial"
             and l.lot_id
-            and l.company_id == self.company_id
         )
         done_serial_lines.fix_serial_source_location()
         return super().button_validate()

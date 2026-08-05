@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     "name": "Stock Barcode - Free Serial Location Pick",
-    "version": "17.0.0.1.2",
+    "version": "17.0.0.1.3",
     "category": "Inventory/Inventory",
     "summary": "Pick serial-tracked products from any location, not just the reserved one",
     "description": """
@@ -40,9 +40,11 @@ Features
 
 Technical Details
 -----------------
-* JS patch on BarcodePickingModel (createNewLine, _createNewLine, _updateLineQty)
-  for serial line matching and reserved-quantity enforcement
+* JS patch on BarcodePickingModel (createNewLine, updateLine) for serial line
+  matching and reserved-quantity enforcement
 * Overrides ``stock.picking.button_validate`` to fix locations pre-validation
+* Never touches lines already in state ``done``, so re-validating a picking
+  (double-click, backorder wizard) cannot reverse a completed transfer
 * Extends ``stock.move.line`` with a helper method for location correction
 * Queries ``stock.quant`` for the positive internal quant of each serial
 
