@@ -36,8 +36,8 @@ class StockMoveLine(models.Model):
         done. Odoo logs it as "The done move line has been corrected."
         """
         for line in self:
-            # if line.state == "done":
-            #     continue
+            if line.state == "done":
+                continue
 
             if line.product_id.tracking != "serial" or not line.lot_id:
                 continue

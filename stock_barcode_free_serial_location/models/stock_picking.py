@@ -35,7 +35,7 @@ class StockPicking(models.Model):
         """
         done_serial_lines = self.move_line_ids.filtered(
             lambda l: l.qty_done > 0
-            # and l.state != "done"
+            and l.state != "done"
             and l.product_id.tracking == "serial"
             and l.lot_id
         )
