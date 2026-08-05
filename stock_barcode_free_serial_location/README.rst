@@ -98,11 +98,16 @@ Features
   creating a duplicate move line
 - **Reserved quantity enforcement** — blocks adding unreserved products and
   over-scanning for any tracking type (serial, lot, or none), with an immediate
-  danger notification
+  danger notification. Applies to warehouse flow operations (Receipts,
+  Deliveries, Pick, Pack); standalone Internal Transfers keep Odoo's default
+  behaviour of allowing extra products
 - **No extra steps** required from warehouse operators beyond normal scanning
 - **No UI changes** — works silently in the background
 - **Safe fallback** — skips location correction when the serial cannot be found
   in stock; Odoo's standard validation error surfaces these cases
+- **Never rewrites completed movements** — lines already in state ``done`` are
+  left untouched, so re-validating a picking cannot reverse a transfer that has
+  already happened
 
 Technical Notes
 ===============
@@ -137,6 +142,14 @@ The module operates across two layers:
   is harmless in that situation because done moves are filtered out
   (``stock/models/stock_move.py:1914``), but this override runs *before*
   ``super()``, so it must exclude done lines itself.
+
+``stock.picking._get_stock_barcode_data()``
+  Adds an ``enforce_reservation_limit`` flag to the barcode client config. It is
+  false for standalone Internal Transfers and true for everything else. Pick,
+  Pack and Internal Transfer all share ``picking_type.code == 'internal'``, so
+  the operation type is compared against the warehouse's ``int_type_id`` foreign
+  key, which is stable, rather than against the user-editable ``sequence_code``
+  prefix.
 
 **JavaScript (client-side) — scanning behaviour**
 
@@ -180,6 +193,8 @@ Edge Cases
   (Odoo's "add extra product?" confirmation is not shown).
 * **Lot or untracked products:** source location fix is skipped at validation;
   reserved quantity enforcement still applies during scanning.
+* **Standalone internal transfer:** reserved quantity guard is disabled;
+  operators may add arbitrary products. Pick and Pack stay guarded.
 * **Source location already correct:** no write is performed.
 * **Picking validated twice** (double-click, or backorder wizard re-entry): the
   second pass skips all done lines, so the completed transfer is left intact.
