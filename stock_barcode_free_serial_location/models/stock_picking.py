@@ -34,10 +34,9 @@ class StockPicking(models.Model):
         ``line.company_id``.
         """
         done_serial_lines = self.move_line_ids.filtered(
-            lambda l: l.state != "done"
-            and l.qty_done > 0
-            and l.product_id.tracking == "serial"
-            and l.lot_id
+            # lambda l: l.state != "done"
+            # and
+            l.qty_done > 0 and l.product_id.tracking == "serial" and l.lot_id
         )
         done_serial_lines.fix_serial_source_location()
         return super().button_validate()

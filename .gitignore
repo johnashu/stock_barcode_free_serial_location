@@ -4,3 +4,4 @@ debug/diagnose_double_validate.py
 debug/pick-03250.json
 debug/traceability-303250.json
 debug/wed.assests_web.min.js
+debug/verify_fix.py
