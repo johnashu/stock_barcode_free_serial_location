@@ -24,13 +24,20 @@ class StockPicking(models.Model):
         runs *before* ``super()``, so without this guard it would still rewrite the
         source location of lines whose stock has already moved, reversing the
         transfer. See ``fix_serial_source_location`` for the mechanism.
+
+        There is deliberately no company filter here. ``self.move_line_ids`` are
+        by definition the lines of this picking, and each line's ``company_id``
+        is copied from its move (or the picking) at creation
+        (odoo/addons/stock/models/stock_move_line.py:343-346), so the comparison
+        never excluded anything. The company filter that does matter is on the
+        quant search in ``fix_serial_source_location``, which is scoped to
+        ``line.company_id``.
         """
         done_serial_lines = self.move_line_ids.filtered(
             lambda l: l.state != "done"
             and l.qty_done > 0
             and l.product_id.tracking == "serial"
             and l.lot_id
-            and l.company_id == l.picking_id.company_id
         )
         done_serial_lines.fix_serial_source_location()
         return super().button_validate()
