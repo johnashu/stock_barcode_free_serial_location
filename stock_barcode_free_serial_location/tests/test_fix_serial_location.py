@@ -318,6 +318,127 @@ class TestFixSerialLocation(TransactionCase):
         )
         self.assertFalse(negative)
 
+    def test_revalidate_done_picking_does_not_reverse_the_transfer(self):
+        """A second button_validate() on an already-done picking must be a no-op.
+
+        Regression test. button_validate() is re-entered routinely — a double
+        click, or the backorder wizard calling it again. Because this module's
+        override runs before super(), it used to re-run the location fix on lines
+        that were already done. By then the serial's quant sits at the
+        *destination*, so the fix rewrote the source to the destination, and
+        Odoo's done-line handling reversed the completed movement and returned
+        the serial to where it started — leaving the picking reading
+        ``source == destination`` and the stock never actually moved.
+
+        The destination here must be an internal location for the bug to be
+        observable: after a delivery to Customers the serial has no positive
+        internal quant left, so the quant search finds nothing either way.
+        """
+        loc_dest = self.env["stock.location"].create(
+            {
+                "name": "Test Shelf Destination",
+                "location_id": self.stock_location.id,
+                "usage": "internal",
+                "company_id": self.company.id,
+            }
+        )
+        sn = self._make_serial("SN-REVALIDATE-001")
+        self._put_stock(self.loc_actual, sn)
+
+        picking = self.env["stock.picking"].create(
+            {
+                "picking_type_id": self.warehouse.int_type_id.id,
+                "location_id": self.loc_actual.id,
+                "location_dest_id": loc_dest.id,
+                "company_id": self.company.id,
+            }
+        )
+        move = self.env["stock.move"].create(
+            {
+                "name": self.product_serial.name,
+                "picking_id": picking.id,
+                "product_id": self.product_serial.id,
+                "product_uom_qty": 1.0,
+                "product_uom": self.product_serial.uom_id.id,
+                "location_id": self.loc_actual.id,
+                "location_dest_id": loc_dest.id,
+                "company_id": self.company.id,
+            }
+        )
+        picking.action_confirm()
+        move.move_line_ids.unlink()
+        self.env["stock.move.line"].create(
+            {
+                "move_id": move.id,
+                "picking_id": picking.id,
+                "product_id": self.product_serial.id,
+                "product_uom_id": self.product_serial.uom_id.id,
+                "location_id": self.loc_actual.id,
+                "location_dest_id": loc_dest.id,
+                "lot_id": sn.id,
+                "qty_done": 1.0,
+                "company_id": self.company.id,
+            }
+        )
+
+        picking.button_validate()
+        self.assertEqual(picking.state, "done")
+        self.assertEqual(move.move_line_ids.location_id, self.loc_actual)
+
+        picking.button_validate()  # second click / backorder wizard re-entry
+
+        line = move.move_line_ids
+        self.assertEqual(
+            line.location_id,
+            self.loc_actual,
+            "Re-validating must not rewrite the source of a done move line",
+        )
+        self.assertNotEqual(
+            line.location_id,
+            line.location_dest_id,
+            "Source must not be collapsed onto the destination",
+        )
+
+        quant = self.env["stock.quant"].search(
+            [
+                ("product_id", "=", self.product_serial.id),
+                ("lot_id", "=", sn.id),
+                ("quantity", ">", 0),
+            ]
+        )
+        self.assertEqual(
+            quant.location_id,
+            loc_dest,
+            "The serial must stay at the destination, not be returned to source",
+        )
+
+    def test_fix_skips_done_lines_called_directly(self):
+        """The guard lives in fix_serial_source_location itself, not only in the
+        button_validate filter, so direct callers are protected too."""
+        loc_dest = self.env["stock.location"].create(
+            {
+                "name": "Test Shelf Destination Direct",
+                "location_id": self.stock_location.id,
+                "usage": "internal",
+                "company_id": self.company.id,
+            }
+        )
+        sn = self._make_serial("SN-DONE-DIRECT-001")
+        self._put_stock(self.loc_actual, sn)
+
+        picking, move = self._create_picking_with_line(self.loc_actual, sn)
+        picking.location_dest_id = loc_dest
+        move.location_dest_id = loc_dest
+        move.move_line_ids.location_dest_id = loc_dest
+        picking.button_validate()
+        self.assertEqual(picking.state, "done")
+
+        line = move.move_line_ids
+        line.fix_serial_source_location()
+
+        self.assertEqual(line.location_id, self.loc_actual)
+        self.assertEqual(line.state, "done")
+
     # -------------------------------------------------------------------------
     # Barcode config — reservation guard scope is decided server-side
     # -------------------------------------------------------------------------

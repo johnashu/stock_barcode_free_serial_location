@@ -116,11 +116,36 @@ The module operates across two layers:
   a positive internal quant matching the serial number. If found in a different
   location than the reserved one, updates ``location_id`` on the move line.
 
+  Lines already in state ``done`` are skipped. This is a correctness
+  requirement, not a defensive nicety: writing ``location_id`` on a done move
+  line makes Odoo reverse the completed movement
+  (``stock/models/stock_move_line.py:502-521``) — it takes the quantity back off
+  the destination, returns it to the old source, then re-applies the move from
+  the new source. Since a validated picking has already deposited the serial at
+  its destination, running the fix again would rewrite the source *to* the
+  destination, undo the transfer and return the serial to where it started,
+  while the picking still displays as done. Odoo records this in the chatter as
+  "The done move line has been corrected."
+
 ``stock.picking.button_validate()``
-  Before delegating to the standard validation flow, collects all done
-  serial-tracked lines and calls ``fix_serial_source_location()``.
+  Before delegating to the standard validation flow, collects the serial-tracked
+  lines that are not yet done and calls ``fix_serial_source_location()``.
+
+  The not-done filter matters. ``button_validate()`` is re-entered routinely — a
+  double-click on Validate, or the backorder wizard calling it a second time
+  (``stock/wizard/stock_backorder_confirmation.py:67``). Odoo's own ``super()``
+  is harmless in that situation because done moves are filtered out
+  (``stock/models/stock_move.py:1914``), but this override runs *before*
+  ``super()``, so it must exclude done lines itself.
 
 **JavaScript (client-side) — scanning behaviour**
+
+``BarcodePickingModel._isOverReserved()`` (new)
+  Helper shared by the patches below. Sums ``reserved_uom_qty`` for the product
+  across ``pageLines`` and compares it against the running ``qty_done`` total.
+  Returns true and raises a danger notification when the product has no
+  reservation on the transfer, or when the requested delta would exceed it.
+  Inert when ``config.enforce_reservation_limit`` is false.
 
 ``BarcodePickingModel.createNewLine()`` (patch)
   For serial-tracked products, searches ``pageLines`` for an unstarted reserved
@@ -131,14 +156,16 @@ The module operates across two layers:
   For all product types, rejects the scan when the product has no reservation
   on the transfer or when adding one more unit would exceed the reserved total.
 
-``BarcodePickingModel._createNewLine()`` (patch)
-  Same reserved-quantity checks for code paths that create lines directly (e.g.
-  excess quantity after filling a line), which bypass ``createNewLine()``.
+  Before redirecting, it points ``lastScanned.sourceLocation`` at the reserved
+  line's own location. Odoo's ``updateLine()`` stamps that value onto
+  ``line.location_id`` whenever the caller does not pass one explicitly
+  (``stock_barcode/static/src/models/barcode_picking_model.js:214-216``), so
+  without this the redirect would overwrite the reserved line's source.
 
-``BarcodePickingModel._updateLineQty()`` (patch)
-  Enforces the reserved cap on every quantity increment (barcode scans and
-  the + button). Compares cumulative ``qty_done`` against the initial reserved
-  total for the product on this transfer.
+``BarcodePickingModel.updateLine()`` (patch)
+  Enforces the reserved cap on every quantity increment that carries a
+  ``qty_done`` (barcode scans and the + button), including the increments routed
+  here by the ``createNewLine()`` patch above.
 
 Edge Cases
 ==========
@@ -154,6 +181,8 @@ Edge Cases
 * **Lot or untracked products:** source location fix is skipped at validation;
   reserved quantity enforcement still applies during scanning.
 * **Source location already correct:** no write is performed.
+* **Picking validated twice** (double-click, or backorder wizard re-entry): the
+  second pass skips all done lines, so the completed transfer is left intact.
 
 Support
 =======

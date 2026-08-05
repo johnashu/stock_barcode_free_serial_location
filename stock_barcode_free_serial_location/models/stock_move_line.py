@@ -18,13 +18,27 @@ class StockMoveLine(models.Model):
         a serial from a location other than the one Odoo reserved.
 
         Lines are skipped (left unchanged) when:
+        - The line is already done (see below)
         - The product is not serial-tracked
         - No lot/serial is set on the line
         - No positive internal quant can be found for the serial (Odoo's own
           validation will surface this as an error)
         - The quant location already matches the move line location
+
+        The done check is critical, not defensive. Writing ``location_id`` on a
+        done move line makes Odoo *reverse* the completed movement
+        (odoo/addons/stock/models/stock_move_line.py:502-521): it takes the
+        quantity back off the destination, returns it to the old source, then
+        re-applies the move from the new source. On a picking that has already
+        been validated the serial's quant now sits at the *destination*, so this
+        method would rewrite the source to the destination, undo the transfer and
+        return the serial to where it started -- while the picking still reads as
+        done. Odoo logs it as "The done move line has been corrected."
         """
         for line in self:
+            if line.state == "done":
+                continue
+
             if line.product_id.tracking != "serial" or not line.lot_id:
                 continue
 
