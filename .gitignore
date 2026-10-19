@@ -1,0 +1,51 @@
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+
+# Secrets / local env
+.env
+.env.*
+!.env.example
+
+# Archives / bulky dumps
+*.zip
+*.tar.gz
+*.gz
+*.bz2
+*.rar
+*.7z
+*.tar
+*.tar.bz2
+*.tar.xz
+*.DBF
+*.eml
+*.sql
+*.sqlite3
+*.sqlite
+*.dump
+
+# data
+*.csv
+*.xlsx
+*.xls
+*.ods
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Logs
+*.log
+
+# Client-specific
+intact_data/
+
